@@ -1,0 +1,26 @@
+{
+    "name": "shasoft/db-tool",
+    "type": "library",
+    "description": "Tools for working with databases",
+    "keywords": [
+        "database",
+        "tool",
+        "pdo"
+    ],
+    "require": {
+        "phpmyadmin/sql-parser": "*"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Shasoft\\DbTool\\": "classes"
+        }
+    },
+    "minimum-stability": "dev",
+    "authors": [
+        {
+            "name": "Shabanov Valera",
+            "email": "shasoft_db-tool@shasoft.com"
+        }
+    ]
+}
