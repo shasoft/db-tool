@@ -36,7 +36,7 @@ class DbToolPdoLog
         return $ret;
     }
     // Записать в лог информацию о ВЫПОЛНЕННОМ запросе
-    static public function write(\PDOStatement $sth): void
+    static public function write(\PDOStatement $sth, ?\PDO $pdo = null, ?array $params = null): void
     {
         if (self::$on) {
             // Вывести информацию о запросе
@@ -44,27 +44,64 @@ class DbToolPdoLog
             $sth->debugDumpParams();
             $text = ob_get_contents();
             ob_end_clean();
-            //s_dump($text, $this->sth->queryString);
             //
             $marker = "\nParams:";
             $pos = strrpos($text, $marker);
             $cnt = intval(ltrim(substr($text, $pos + strlen($marker))));
             // оставить SQL
-            $text = substr($text, 0, $pos);
-            //s_dump($pos, $text);
+            $sql = substr($text, 0, $pos);
+            //s_dump($pos, $text, $cnt);
             // В зависимости от количества параметров
             if ($cnt == 0) {
-                $pos = strpos($text, ']');
-                $text = substr($text, $pos + 1);
+                $pos = strpos($sql, ']');
+                $sql = substr($sql, $pos + 1);
             } else {
-                $pos = strpos($text, 'Sent SQL: [');
-                $pos = strpos($text, ']', $pos);
-                $text = substr($text, $pos + 1);
+                $pos = strpos($sql, 'Sent SQL: [');
+                if ($pos !== false) {
+                    $pos = strpos($sql, ']', $pos);
+                    $sql = substr($sql, $pos + 1);
+                } else {
+                    $pos = strpos($sql, ']');
+                    $sql = substr($sql, $pos + 1);
+                    if (!is_null($pdo) && !is_null($params)) {
+                        $tmp = explode('Key: Name:', $text);
+                        array_shift($tmp);
+                        foreach ($tmp as $str) {
+                            $tmpItem = explode("\n", $str);
+                            array_shift($tmpItem);
+                            $pValues = [];
+                            foreach ($tmpItem as $line) {
+                                $line = trim($line);
+                                if (!empty($line)) {
+                                    $tmpLine = explode('=', $line);
+                                    if ($tmpLine[0] == 'name') {
+                                        $tmpLine[1] = substr($tmpLine[1], strpos($tmpLine[1], ':') + 1);
+                                        $tmpLine[1] = str_replace('"', '', $tmpLine[1]);
+                                    }
+                                    $pValues[$tmpLine[0]] = $tmpLine[1];
+                                }
+                            }
+                            $name = $pValues['name'];
+                            $type = intval($pValues['param_type']);
+                            //
+                            if ($type == \PDO::PARAM_INT) {
+                                $repValue = $params[$name];
+                            } else if ($type == \PDO::PARAM_NULL) {
+                                $repValue = 'NULL';
+                            } else {
+                                $repValue = $pdo->quote($params[$name], $type);
+                            }
+                            // Заменить значение
+                            $sql = str_replace(':' . $name, $repValue, $sql);
+                        }
+                    }
+                }
             }
             // Заменить все непечатные символы на тильду 
-            $text = preg_replace('/[[:^print:]]/', '~', $text);
+            //$sql = preg_replace('/[[:^print:]]/', '~', $sql);
+            $sql = mb_ereg_replace('/[[:^print:]]/', '~', $sql);
             // SQL запрос
-            self::$sqlLog[] = trim($text);
+            self::$sqlLog[] = trim($sql);
             /*
         $parser = new Parser($text);
         $flags = PdoQuery::getFlags($parser->statements[0]);
